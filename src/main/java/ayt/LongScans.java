@@ -17,27 +17,28 @@ import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
+import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 
 public class LongScans {
   public static void main(String[] args) throws Exception {
     Properties props = new Properties();
-    if (args.length == 1) {
-      try (FileInputStream fis = new FileInputStream(new File(args[0]))) {
-        props.load(fis);
-      }
+
+    try (FileInputStream fis = new FileInputStream(new File(args[0]))) {
+      props.load(fis);
     }
 
+
     Connector conn = Util.getConnector(props);
-    String table = props.getProperty("table", "yieldTest");
-    String suffix = props.getProperty("suffix", "973973");
-    int numScans = Integer.parseInt(props.getProperty("numLongScans", "10"));
-    String yieldCount = props.getProperty("yieldCount", "10000");
+    String table = props.getProperty("table");
+    String suffix = props.getProperty("suffix");
+    int numScans = Integer.parseInt(props.getProperty("numLongScans"));
+    String yieldCount = props.getProperty("yieldCount");
 
 
     ExecutorService executor = Executors.newCachedThreadPool();
     try {
 
-      List<Future<Integer>> futures = new ArrayList<>();
+      List<Future<Long>> futures = new ArrayList<>();
 
       for (int i = 0; i < numScans; i++) {
         futures.add(executor.submit(() -> {
@@ -50,6 +51,9 @@ public class LongScans {
             scanner.setReadaheadThreshold(0);
 
             int count = 0;
+
+            long t1 = System.currentTimeMillis();
+
             for (Entry<Key, Value> entry : scanner) {
               if (!entry.getKey().getRowData().toString().endsWith(suffix)) {
                 System.err.println("Saw incorrect suffix " + entry.getKey());
@@ -58,18 +62,23 @@ public class LongScans {
               count++;
             }
 
-            return count;
+            long t2 = System.currentTimeMillis();
+
+            return t2-t1;
           } catch (TableNotFoundException e) {
             throw new RuntimeException(e);
           }
         }));
       }
 
-      for (Future<Integer> future : futures) {
-        int count = future.get();
-        System.out.println("Got count " + count);
+      SummaryStatistics stats = new SummaryStatistics();
+
+      for (Future<Long> future : futures) {
+        long time = future.get();
+        stats.addValue(time);
       }
 
+      System.out.println(stats.toString());
     } finally {
       executor.shutdownNow();
     }
