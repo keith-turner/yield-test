@@ -19,7 +19,7 @@ suffix=973973
 numLongScans=127
 yieldCount=10000
 
-numShortScans=250
+numShortScans=50
 rangesPerScan=5
 EOP
 
